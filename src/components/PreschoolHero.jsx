@@ -1,14 +1,211 @@
-import React, { useEffect, useRef, useMemo, useState } from 'react';
+import React, { useEffect, useRef, useMemo, useState, useLayoutEffect } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { Search, Phone, Rocket, PenTool, Globe, User, Layers, ArrowUpRight } from 'lucide-react';
+import { Search, Phone, Rocket, PenTool, Globe, User, Layers, ArrowUpRight, ArrowDown } from 'lucide-react';
+
+// =========================================================================
+// 👇 IMAGE IMPORTS
+// Based on your error, we are stepping up one folder (..) to find assets.
+// Verify your folder structure is: src/components (this file) & src/assets (images)
+// =========================================================================
+import cloudImg1 from '../assets/cloud-1.webp'; 
+import cloudImg2 from '../assets/cloud-2.webp';
 
 // Register GSAP Plugin
 gsap.registerPlugin(ScrollTrigger);
 
 // ==========================================
-// 1. UTILITY: SCROLL REVEAL TEXT
+// 0. LIQUID GLASS COMPONENTS
+// ==========================================
+
+const GlassFilter = () => (
+  <svg style={{ position: 'absolute', top: -9999, left: -9999, width: 0, height: 0 }}>
+    <filter
+      id="glass-distortion"
+      x="0%"
+      y="0%"
+      width="100%"
+      height="100%"
+      filterUnits="objectBoundingBox"
+    >
+      <feTurbulence
+        type="fractalNoise"
+        baseFrequency="0.001 0.005"
+        numOctaves="1"
+        seed="17"
+        result="turbulence"
+      />
+      <feComponentTransfer in="turbulence" result="mapped">
+        <feFuncR type="gamma" amplitude="1" exponent="10" offset="0.5" />
+        <feFuncG type="gamma" amplitude="0" exponent="1" offset="0" />
+        <feFuncB type="gamma" amplitude="0" exponent="1" offset="0.5" />
+      </feComponentTransfer>
+      <feGaussianBlur in="turbulence" stdDeviation="3" result="softMap" />
+      <feSpecularLighting
+        in="softMap"
+        surfaceScale="5"
+        specularConstant="1"
+        specularExponent="100"
+        lightingColor="white"
+        result="specLight"
+      >
+        <fePointLight x="-200" y="-200" z="300" />
+      </feSpecularLighting>
+      <feComposite
+        in="specLight"
+        operator="arithmetic"
+        k1="0"
+        k2="1"
+        k3="1"
+        k4="0"
+        result="litImage"
+      />
+      <feDisplacementMap
+        in="SourceGraphic"
+        in2="softMap"
+        scale="20" 
+        xChannelSelector="R"
+        yChannelSelector="G"
+      />
+    </filter>
+  </svg>
+);
+
+const GlassEffect = ({
+  children,
+  className = "",
+  style = {},
+  enableHover = true
+}) => {
+  const glassStyle = {
+    boxShadow: "0 6px 6px rgba(0, 0, 0, 0.1), 0 0 20px rgba(0, 0, 0, 0.05)",
+    transitionTimingFunction: "cubic-bezier(0.175, 0.885, 0.32, 2.2)",
+    ...style,
+  };
+
+  return (
+    <div
+      className={`relative flex font-semibold overflow-hidden text-black transition-all duration-700 ${enableHover ? 'hover:scale-[1.02]' : ''} ${className}`}
+      style={glassStyle}
+    >
+      <div
+        className="absolute inset-0 z-0 overflow-hidden rounded-[inherit]"
+        style={{
+          backdropFilter: "blur(8px)",
+          filter: "url(#glass-distortion)",
+          isolation: "isolate",
+          opacity: 0.8
+        }}
+      />
+      <div
+        className="absolute inset-0 z-10 rounded-[inherit]"
+        style={{ background: "rgba(255, 255, 255, 0.65)" }}
+      />
+      <div
+        className="absolute inset-0 z-20 rounded-[inherit] overflow-hidden"
+        style={{
+          boxShadow:
+            "inset 2px 2px 1px 0 rgba(255, 255, 255, 0.8), inset -1px -1px 1px 1px rgba(255, 255, 255, 0.3)",
+        }}
+      />
+      <div className="relative z-30 w-full">{children}</div>
+    </div>
+  );
+};
+
+// ==========================================
+// 1. LANDING WRAPPER (Handles Cloud Pinning)
+// ==========================================
+// This component wraps the Hero and pins the screen
+// so the Hero stays still while the clouds open.
+const LandingWrapper = ({ children }) => {
+  const wrapperRef = useRef(null);
+  const leftCloudRef = useRef(null);
+  const rightCloudRef = useRef(null);
+  const textRef = useRef(null);
+  const heroContentRef = useRef(null);
+  const bgRef = useRef(null);
+
+  useLayoutEffect(() => {
+    let ctx = gsap.context(() => {
+      const tl = gsap.timeline({
+        scrollTrigger: {
+          trigger: wrapperRef.current,
+          start: "top top",
+          end: "+=1500", // Scroll distance required to open clouds
+          scrub: 1,
+          pin: true,    // 👈 THIS FIXES THE HERO SCROLLING AWAY ISSUE
+          anticipatePin: 1
+        }
+      });
+
+      // 1. Move Clouds Apart (Outwards)
+      tl.to(leftCloudRef.current, { xPercent: -150, ease: "power2.inOut" }, 0);
+      tl.to(rightCloudRef.current, { xPercent: 150, ease: "power2.inOut" }, 0);
+
+      // 2. Fade/Move Text
+      tl.to(textRef.current, { opacity: 0, scale: 0.8, y: -50, ease: "power2.in" }, 0);
+
+      // 3. Fade out the dark background overlay
+      tl.to(bgRef.current, { opacity: 0, ease: "power1.inOut" }, 0.1);
+
+      // 4. Subtle Zoom on Hero for dynamic effect
+      tl.from(heroContentRef.current, { scale: 0.95, opacity: 0.5, ease: "power1.out" }, 0);
+
+    }, wrapperRef);
+
+    return () => ctx.revert();
+  }, []);
+
+  return (
+    <div ref={wrapperRef} className="relative w-full h-screen overflow-hidden bg-white">
+      
+      {/* --- CLOUD OVERLAY (Z-Index 100 to stay on top) --- */}
+      <div className="absolute inset-0 z-[100] pointer-events-none flex items-center justify-center">
+        
+        {/* Dark Background Overlay (Fades out) */}
+        <div ref={bgRef} className="absolute inset-0 bg-black z-0"></div>
+
+        {/* Left Cloud */}
+        <div ref={leftCloudRef} className="absolute top-0 bottom-0 left-0 w-[65%] z-20 flex items-center justify-start overflow-hidden">
+             <img 
+               src={cloudImg1} 
+               alt="Cloud Left" 
+               className="w-full h-full object-cover mix-blend-screen scale-125 translate-x-[-10%]" 
+             />
+        </div>
+
+        {/* Right Cloud */}
+        <div ref={rightCloudRef} className="absolute top-0 bottom-0 right-0 w-[65%] z-20 flex items-center justify-end overflow-hidden">
+             <img 
+               src={cloudImg2} 
+               alt="Cloud Right" 
+               className="w-full h-full object-cover mix-blend-screen scale-125 translate-x-[10%]" 
+             />
+        </div>
+
+        {/* Intro Text */}
+        <div ref={textRef} className="relative z-30 flex flex-col items-center text-white mix-blend-difference">
+            <h1 className="text-5xl md:text-8xl font-black uppercase tracking-wider mb-4">Welcome</h1>
+            <div className="flex flex-col items-center gap-2 animate-bounce opacity-80">
+                <span className="text-xs font-mono uppercase tracking-[0.3em]">Scroll Down</span>
+                <ArrowDown size={24} />
+            </div>
+        </div>
+      </div>
+
+      {/* --- HERO CONTENT (Pinned Underneath) --- */}
+      <div ref={heroContentRef} className="relative w-full h-full z-10">
+        {children}
+      </div>
+
+    </div>
+  );
+};
+
+// ==========================================
+// 2. UTILITY: SCROLL REVEAL TEXT
 // ==========================================
 const ScrollReveal = ({
   children,
@@ -52,86 +249,106 @@ const ScrollReveal = ({
 };
 
 // ==========================================
-// 2. HERO SECTION
+// 3. NAVBAR & HERO COMPONENTS
 // ==========================================
 const Navbar = () => (
-  <nav className="flex items-center justify-between px-6 md:px-12 py-6 relative z-50 max-w-7xl mx-auto">
-    <div className="flex items-center gap-2 cursor-pointer">
-      <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center text-orange-500 shadow-sm"><PenTool size={20} className="transform -rotate-45" /></div>
-      <span className="text-2xl font-extrabold text-gray-800 tracking-tight">Kidearn</span>
+  // Reduced z-index to 40 so clouds (z-100) cover it
+  <div className="absolute top-6 left-0 right-0 z-40 flex justify-center px-4 pointer-events-none">
+    <div className="pointer-events-auto">
+      <GlassEffect className="rounded-full px-2 py-2 md:px-8 md:py-3" enableHover={false}>
+        <nav className="flex items-center gap-6 md:gap-12">
+          <div className="flex items-center gap-2 cursor-pointer pr-4 md:pr-0">
+            <div className="w-8 h-8 md:w-10 md:h-10 bg-orange-100/80 rounded-full flex items-center justify-center text-orange-600 shadow-sm">
+              <PenTool size={18} className="transform -rotate-45" />
+            </div>
+            <span className="text-xl md:text-2xl font-extrabold text-slate-900 tracking-tight">Kidearn</span>
+          </div>
+          <div className="hidden lg:flex items-center gap-8 font-bold text-slate-600 text-[15px]">
+            <a href="#" className="text-orange-600">Home</a>
+            <a href="#" className="hover:text-orange-600 transition-colors">About</a>
+            <a href="#" className="hover:text-orange-600 transition-colors">Program</a>
+            <a href="#" className="hover:text-orange-600 transition-colors">Contact</a>
+          </div>
+          <div className="hidden md:flex items-center gap-4">
+            <button className="w-10 h-10 rounded-full border border-gray-200/50 flex items-center justify-center text-gray-500 bg-white/50 hover:bg-white hover:text-orange-500 transition-all">
+              <Search size={18} />
+            </button>
+            <button className="flex items-center gap-2 bg-orange-500 text-white px-5 py-2.5 rounded-full font-bold shadow-lg shadow-orange-500/25 hover:scale-105 hover:bg-orange-600 transition-all">
+              <Phone size={16} />
+              <span>Questions</span>
+            </button>
+          </div>
+          <div className="md:hidden pr-2 text-slate-800">
+             <Layers size={24} />
+          </div>
+        </nav>
+      </GlassEffect>
     </div>
-    <div className="hidden lg:flex items-center gap-8 font-bold text-gray-500 text-[15px]">
-      <a href="#" className="text-orange-500">Home</a>
-      <a href="#" className="hover:text-orange-500 transition-colors">About</a>
-      <a href="#" className="hover:text-orange-500 transition-colors">Program</a>
-      <a href="#" className="hover:text-orange-500 transition-colors">Contact</a>
-    </div>
-    <div className="hidden md:flex items-center gap-6">
-      <button className="w-10 h-10 rounded-full border border-gray-200 flex items-center justify-center text-gray-500 bg-white hover:text-orange-500"><Search size={18} /></button>
-      <button className="flex items-center gap-2 bg-orange-500 text-white px-6 py-3 rounded-full font-bold shadow-lg shadow-orange-500/25 hover:scale-105 transition-all"><Phone size={18} /><span>Questions</span></button>
-    </div>
-  </nav>
+  </div>
 );
 
 const Hero = () => {
   const containerRef = useRef(null);
   const imageRef = useRef(null);
+  
   useEffect(() => {
     let ctx = gsap.context(() => {
       const tl = gsap.timeline();
-      tl.from(".hero-text-element", { y: 60, opacity: 0, duration: 1, stagger: 0.15, ease: "elastic.out(1, 0.75)" });
+      tl.from(".hero-text-element", { y: 60, opacity: 0, duration: 1, stagger: 0.15, ease: "elastic.out(1, 0.75)", delay: 0.2 });
       tl.from(imageRef.current, { scale: 0.8, opacity: 0, rotation: 5, duration: 1.2, ease: "elastic.out(1, 0.5)" }, "-=0.8");
     }, containerRef);
     return () => ctx.revert();
   }, []);
 
   return (
-    <div className="bg-gradient-to-br from-orange-50/50 to-white pb-20">
+    <div className="bg-gradient-to-br from-orange-50/50 to-white pb-20 pt-32 h-full min-h-screen flex flex-col justify-center relative">
+        <GlassFilter />
         <Navbar />
-        <section ref={containerRef} className="relative pt-4 md:pt-10 overflow-hidden">
-        <div className="absolute inset-0 pointer-events-none">
-            <motion.div animate={{ x: [0, 50, 0] }} transition={{ duration: 20, repeat: Infinity, ease: "linear" }} className="absolute top-20 right-20 text-blue-100 opacity-50">
-            <svg width="100" height="60" viewBox="0 0 24 24" fill="currentColor"><path d="M17.5,19c-3.037,0-5.5-2.463-5.5-5.5c0-0.34,0.032-0.671,0.091-0.994C11.597,12.222,10.825,12,10,12c-2.209,0-4,1.791-4,4 c0,1.441,0.77,2.697,1.912,3.398C8.369,19.826,9.157,20,10,20h7.5c2.485,0,4.5-2.015,4.5-4.5S19.985,11,17.5,11 c-0.199,0-0.392,0.015-0.58,0.041C16.48,8.239,13.791,6.5,11,7c-3.314,0-6,2.686-6,6c0,0.413,0.045,0.814,0.124,1.203 C3.284,15.143,2,16.896,2,19c0,2.761,2.239,5,5,5h10.5c3.037,0,5.5-2.463,5.5-5.5S20.537,13,17.5,13V19z"/></svg>
-            </motion.div>
-        </div>
-        <div className="max-w-7xl mx-auto px-6 md:px-12 grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16 items-center">
-            <div className="relative z-10 pt-10 lg:pt-0 text-center lg:text-left">
-            <div className="inline-block relative">
-                <h3 className="hero-text-element text-xl font-handwriting text-orange-500 font-bold mb-4 tracking-wider uppercase">Kindergarten & Baby Care</h3>
-                <svg className="absolute -bottom-2 left-0 w-full h-3 text-yellow-300 opacity-80" viewBox="0 0 100 10" preserveAspectRatio="none"><path d="M0 5 Q 50 10 100 5" stroke="currentColor" strokeWidth="4" fill="none" /></svg>
-            </div>
-            <h1 className="hero-text-element text-5xl md:text-[4.5rem] leading-[1.1] font-black text-slate-800 mb-6 mt-4">
-                <span className="inline-block text-transparent bg-clip-text bg-gradient-to-r from-slate-800 to-slate-600">Ultimate Child</span><br />
-                <span className="relative z-10">Education Center <span className="absolute bottom-2 left-0 w-full h-4 bg-cyan-100 -z-10 -rotate-1 rounded-full opacity-60"></span></span>
-            </h1>
-            <p className="hero-text-element text-slate-500 text-lg md:text-xl max-w-lg mx-auto lg:mx-0 mb-10 leading-relaxed font-medium">We provide a nurturing environment where children can learn, play, and grow with confidence.</p>
-            <div className="hero-text-element flex flex-col sm:flex-row gap-4 justify-center lg:justify-start relative">
-                <button className="group px-8 py-4 rounded-full bg-orange-500 text-white font-bold text-lg shadow-xl shadow-orange-500/30 hover:bg-orange-600 hover:-translate-y-1 transition-all flex items-center justify-center gap-2">Enroll Now <Rocket size={20} className="group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" /></button>
-                <button className="px-8 py-4 rounded-full bg-cyan-500 text-white font-bold text-lg shadow-xl shadow-cyan-500/30 hover:bg-cyan-600 hover:-translate-y-1 transition-all">Our Programs</button>
-            </div>
-            </div>
-            <div className="relative flex justify-center lg:justify-end mt-0">
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[110%] h-[110%] z-0">
-                <motion.div animate={{ scale: [1, 1.05, 1], rotate: [0, 5, 0] }} transition={{ duration: 8, repeat: Infinity }}><svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><path fill="#FFB800" d="M44.7,-76.4C58.9,-69.2,71.8,-59.1,81.6,-46.6C91.4,-34.1,98.2,-19.2,95.8,-5.3C93.5,8.6,82.1,21.5,70.9,32.2C59.7,42.9,48.8,51.4,37.3,58.3C25.8,65.2,13.7,70.5,-0.6,71.5C-14.9,72.5,-32.2,69.2,-46.3,61C-60.4,52.8,-71.4,39.7,-77.8,24.8C-84.2,9.9,-86,-6.8,-80.6,-21.2C-75.2,-35.6,-62.6,-47.7,-49.6,-55.3C-36.6,-62.9,-23.2,-66,-9.8,-66.4C3.6,-66.8,17,-64.5,30.5,-83.6L44.7,-76.4Z" transform="translate(100 100)" /></svg></motion.div>
-            </div>
-            <div ref={imageRef} className="relative z-10 w-full max-w-lg">
-                <div className="relative rounded-[3rem] overflow-hidden border-4 border-white shadow-2xl rotate-2 hover:rotate-0 transition-transform duration-500 ease-out">
-                    <img src="https://images.unsplash.com/photo-1503454537195-1dcabb73ffb9?q=80&w=2070&auto=format&fit=crop" alt="Preschool girl" className="w-full h-auto object-cover md:h-[500px]" />
-                </div>
-            </div>
-            </div>
-        </div>
+        
+        <section ref={containerRef} className="relative overflow-hidden w-full">
+          <div className="absolute inset-0 pointer-events-none">
+              <motion.div animate={{ x: [0, 50, 0] }} transition={{ duration: 20, repeat: Infinity, ease: "linear" }} className="absolute top-20 right-20 text-blue-100 opacity-50">
+              <svg width="100" height="60" viewBox="0 0 24 24" fill="currentColor"><path d="M17.5,19c-3.037,0-5.5-2.463-5.5-5.5c0-0.34,0.032-0.671,0.091-0.994C11.597,12.222,10.825,12,10,12c-2.209,0-4,1.791-4,4 c0,1.441,0.77,2.697,1.912,3.398C8.369,19.826,9.157,20,10,20h7.5c2.485,0,4.5-2.015,4.5-4.5S19.985,11,17.5,11 c-0.199,0-0.392,0.015-0.58,0.041C16.48,8.239,13.791,6.5,11,7c-3.314,0-6,2.686-6,6c0,0.413,0.045,0.814,0.124,1.203 C3.284,15.143,2,16.896,2,19c0,2.761,2.239,5,5,5h10.5c3.037,0,5.5-2.463,5.5-5.5S20.537,13,17.5,13V19z"/></svg>
+              </motion.div>
+          </div>
+          <div className="max-w-7xl mx-auto px-6 md:px-12 grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16 items-center">
+              <div className="relative z-10 pt-10 lg:pt-0 text-center lg:text-left">
+              <div className="inline-block relative">
+                  <h3 className="hero-text-element text-xl font-handwriting text-orange-500 font-bold mb-4 tracking-wider uppercase">Kindergarten & Baby Care</h3>
+                  <svg className="absolute -bottom-2 left-0 w-full h-3 text-yellow-300 opacity-80" viewBox="0 0 100 10" preserveAspectRatio="none"><path d="M0 5 Q 50 10 100 5" stroke="currentColor" strokeWidth="4" fill="none" /></svg>
+              </div>
+              <h1 className="hero-text-element text-5xl md:text-[4.5rem] leading-[1.1] font-black text-slate-800 mb-6 mt-4">
+                  <span className="inline-block text-transparent bg-clip-text bg-gradient-to-r from-slate-800 to-slate-600">Ultimate Child</span><br />
+                  <span className="relative z-10">Education Center <span className="absolute bottom-2 left-0 w-full h-4 bg-cyan-100 -z-10 -rotate-1 rounded-full opacity-60"></span></span>
+              </h1>
+              <p className="hero-text-element text-slate-500 text-lg md:text-xl max-w-lg mx-auto lg:mx-0 mb-10 leading-relaxed font-medium">We provide a nurturing environment where children can learn, play, and grow with confidence.</p>
+              <div className="hero-text-element flex flex-col sm:flex-row gap-4 justify-center lg:justify-start relative">
+                  <button className="group px-8 py-4 rounded-full bg-orange-500 text-white font-bold text-lg shadow-xl shadow-orange-500/30 hover:bg-orange-600 hover:-translate-y-1 transition-all flex items-center justify-center gap-2">Enroll Now <Rocket size={20} className="group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" /></button>
+                  <button className="px-8 py-4 rounded-full bg-cyan-500 text-white font-bold text-lg shadow-xl shadow-cyan-500/30 hover:bg-cyan-600 hover:-translate-y-1 transition-all">Our Programs</button>
+              </div>
+              </div>
+              <div className="relative flex justify-center lg:justify-end mt-0">
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[110%] h-[110%] z-0">
+                  <motion.div animate={{ scale: [1, 1.05, 1], rotate: [0, 5, 0] }} transition={{ duration: 8, repeat: Infinity }}><svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><path fill="#FFB800" d="M44.7,-76.4C58.9,-69.2,71.8,-59.1,81.6,-46.6C91.4,-34.1,98.2,-19.2,95.8,-5.3C93.5,8.6,82.1,21.5,70.9,32.2C59.7,42.9,48.8,51.4,37.3,58.3C25.8,65.2,13.7,70.5,-0.6,71.5C-14.9,72.5,-32.2,69.2,-46.3,61C-60.4,52.8,-71.4,39.7,-77.8,24.8C-84.2,9.9,-86,-6.8,-80.6,-21.2C-75.2,-35.6,-62.6,-47.7,-49.6,-55.3C-36.6,-62.9,-23.2,-66,-9.8,-66.4C3.6,-66.8,17,-64.5,30.5,-83.6L44.7,-76.4Z" transform="translate(100 100)" /></svg></motion.div>
+              </div>
+              <div ref={imageRef} className="relative z-10 w-full max-w-lg">
+                  <div className="relative rounded-[3rem] overflow-hidden border-4 border-white shadow-2xl rotate-2 hover:rotate-0 transition-transform duration-500 ease-out">
+                      <img src="https://images.unsplash.com/photo-1503454537195-1dcabb73ffb9?q=80&w=2070&auto=format&fit=crop" alt="Preschool girl" className="w-full h-auto object-cover md:h-[500px]" />
+                  </div>
+              </div>
+              </div>
+          </div>
         </section>
     </div>
   );
 };
 
 // ==========================================
-// 3. INFO SECTION
+// 4. INFO SECTION
 // ==========================================
 const InfoSection = () => {
   return (
-    <section className="bg-white min-h-[80vh] py-24 px-6 md:px-12 max-w-[1400px] mx-auto text-black">
+    <section className="bg-white min-h-[80vh] py-24 px-6 md:px-12 max-w-[1400px] mx-auto text-black relative z-10">
       <div className="mb-8"><span className="text-xs font-bold tracking-widest uppercase text-gray-400 border-b-2 border-orange-500 pb-1">Our Mission</span></div>
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
         <div className="lg:col-span-7">
@@ -157,7 +374,7 @@ const InfoSection = () => {
 };
 
 // ==========================================
-// 4. HORIZONTAL SCROLL GALLERY
+// 5. HORIZONTAL SCROLL GALLERY
 // ==========================================
 const projects = [
   { id: "01", title: "Creative\nMasterpiece", category: "PROGRAM", location: "LONDON", client: "KIDEARN", tags: ["ART", "CRAFTS", "FUN"], desc: "A 6x3 metre interactive art wall designed to support the creative growth of children, allowing them to paint freely.", img: "https://images.unsplash.com/photo-1596464716127-f9a8759d1d5a?q=80&w=2070&auto=format&fit=crop" },
@@ -183,7 +400,7 @@ const HorizontalGallery = () => {
     return () => ctx.revert();
   }, []);
   return (
-    <section ref={triggerRef} className="relative overflow-hidden bg-zinc-950 text-white">
+    <section ref={triggerRef} className="relative overflow-hidden bg-zinc-950 text-white z-20">
       <div ref={sectionRef} className="flex h-screen w-fit">
         {projects.map((project, index) => (
           <div key={index} className="w-screen h-screen flex flex-col justify-center px-6 md:px-16 relative flex-shrink-0 border-r border-zinc-900/50">
@@ -210,7 +427,7 @@ const HorizontalGallery = () => {
 };
 
 // ==========================================
-// 5. PARALLAX "MAKE THINGS HAPPEN" SECTION
+// 6. PARALLAX "MAKE THINGS HAPPEN" SECTION
 // ==========================================
 const ParallaxSection = () => {
   const wrapperRef = useRef(null);
@@ -253,7 +470,7 @@ const ParallaxSection = () => {
   }, []);
 
   return (
-    <section ref={wrapperRef} className="relative h-screen w-full overflow-hidden bg-black flex flex-col items-center justify-center">
+    <section ref={wrapperRef} className="relative h-screen w-full overflow-hidden bg-black flex flex-col items-center justify-center z-20">
       <div className="absolute inset-0 grid grid-cols-5 w-full h-full max-w-[90%] mx-auto pointer-events-none">
         {colImages.map((images, colIndex) => (
           <div key={colIndex} className={`parallax-grid-line relative h-full border-r border-white/20 ${colIndex === 0 ? 'border-l' : ''}`}>
@@ -275,7 +492,7 @@ const ParallaxSection = () => {
 };
 
 // ==========================================
-// 6. DARK PROJECT SHOWCASE (NEW CAPPEN SECTION)
+// 7. DARK PROJECT SHOWCASE
 // ==========================================
 const DarkProjectShowcase = () => {
   const containerRef = useRef(null);
@@ -295,7 +512,7 @@ const DarkProjectShowcase = () => {
   }, []);
 
   return (
-    <div ref={containerRef} className="relative min-h-[300vh] bg-black text-white overflow-hidden selection:bg-white selection:text-black">
+    <div ref={containerRef} className="relative min-h-[300vh] bg-black text-white overflow-hidden selection:bg-white selection:text-black z-20">
       {/* BACKGROUND COIL */}
       <div ref={coilRef} className="absolute top-0 left-0 w-full h-screen flex items-center justify-center z-0 pointer-events-none">
         <motion.div style={{ rotate }} className="relative w-[300px] md:w-[500px] aspect-square">
@@ -354,18 +571,25 @@ const DarkProjectShowcase = () => {
 };
 
 // ==========================================
-// 7. MAIN APP EXPORT
+// 8. MAIN APP EXPORT
 // ==========================================
 export default function App() {
   return (
-    <main className="bg-white font-sans text-gray-900 selection:bg-orange-200 selection:text-orange-900">
-      <Hero />
+    <main className="bg-white font-sans text-gray-900 selection:bg-orange-200 selection:text-orange-900 relative">
+      {/* 
+         We wrap the Hero inside LandingWrapper.
+         This Wrapper PINS the Hero to the top, so it stays still while clouds move.
+      */}
+      <LandingWrapper>
+         <Hero />
+      </LandingWrapper>
+
       <InfoSection />
       <HorizontalGallery />
       <ParallaxSection />
       <DarkProjectShowcase />
       
-      <footer className="h-[50vh] bg-[#F2F2F2] text-zinc-500 flex flex-col gap-4 items-center justify-center border-t border-zinc-300">
+      <footer className="h-[50vh] bg-[#F2F2F2] text-zinc-500 flex flex-col gap-4 items-center justify-center border-t border-zinc-300 relative z-20">
         <h3 className="text-2xl font-bold text-zinc-800">Ready to join?</h3>
         <p className="text-sm">© 2024 Kidearn. All Rights Reserved.</p>
       </footer>
