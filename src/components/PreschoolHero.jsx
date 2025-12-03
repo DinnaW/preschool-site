@@ -11,6 +11,8 @@ import { Search, Phone, Rocket, PenTool, Globe, User, Layers, ArrowUpRight, Arro
 // =========================================================================
 import cloudImg1 from '../assets/cloud-1.webp'; 
 import cloudImg2 from '../assets/cloud-2.webp';
+const CLOUD_LEFT = "https://images.unsplash.com/photo-1536514498073-50e69d39c6cf?q=80&w=2000&auto=format&fit=crop"; 
+const CLOUD_RIGHT = "https://images.unsplash.com/photo-1536514498073-50e69d39c6cf?q=80&w=2000&auto=format&fit=crop"
 
 // Register GSAP Plugin
 gsap.registerPlugin(ScrollTrigger);
